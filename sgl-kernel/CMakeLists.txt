@@ -115,6 +115,37 @@ if(CCACHE_FOUND AND ENABLE_CCACHE AND DEFINED ENV{CCACHE_DIR})
     set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "ccache")
 endif()
 
+# Peak build memory is dominated by the final link of common_ops_sm90/sm100,
+# flash_ops, flashmla, and deep_gemm_cpp (each pulls in CUTLASS + flashinfer +
+# DeepGEMM + mscclpp objects -> ~20 GB peak RSS each). On modest CI runners
+# parallel linking OOMs even after compile-stage parallelism is clamped, but
+# forcing serial linking on a big-RAM host wastes time. Size the link pool by
+# how much RAM the host actually has.
+option(SGL_KERNEL_MINIMIZE_BUILD_MEMORY
+    "Auto-size ninja link job-pool by available RAM; pass GNU ld memory-reduction flags when RAM is tight. Default ON." ON)
+set(SGL_KERNEL_LINK_PEAK_MB "20000" CACHE STRING
+    "Estimated peak RSS per link in MB, used to divide MemAvailable into link-pool slots.")
+if(SGL_KERNEL_MINIMIZE_BUILD_MEMORY)
+    cmake_host_system_information(RESULT _mem_avail_mb QUERY AVAILABLE_PHYSICAL_MEMORY)
+    math(EXPR _link_jobs "${_mem_avail_mb} / ${SGL_KERNEL_LINK_PEAK_MB}")
+    if(_link_jobs LESS 1)
+        set(_link_jobs 1)
+    endif()
+    set_property(GLOBAL PROPERTY JOB_POOLS link_pool=${_link_jobs})
+    set(CMAKE_JOB_POOL_LINK link_pool)
+    message(STATUS "sgl-kernel: auto link_pool=${_link_jobs} (available RAM ${_mem_avail_mb} MB, ${SGL_KERNEL_LINK_PEAK_MB} MB/link budget)")
+
+    # Only hobble the linker with memory-frugal flags when we're tight enough
+    # that a single link might not fit. These slow linking ~10-20%, so skip
+    # them on fat hosts.
+    if(_link_jobs LESS 2 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        foreach(_flag_var CMAKE_EXE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS CMAKE_MODULE_LINKER_FLAGS)
+            string(APPEND ${_flag_var} " -Wl,--no-keep-memory -Wl,--reduce-memory-overheads")
+        endforeach()
+        message(STATUS "sgl-kernel: low-memory linker flags enabled (tight RAM)")
+    endif()
+endif()
+
 # Configure gencode below SM90
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
     set(DEFAULT_ENABLE_BELOW_SM90 OFF)
