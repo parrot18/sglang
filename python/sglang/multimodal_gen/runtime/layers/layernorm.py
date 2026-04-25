@@ -142,7 +142,14 @@ class RMSNorm(CustomOp):
 
             x_var = x[..., : self.variance_size_override]
 
-        variance = x_var.pow(2).mean(dim=-1, keepdim=True)
+        # Reduce in fp64 to be invariant to torch's CUDA reduction-kernel changes
+        # (fp32 .mean(dim=-1) summation order changed between torch 2.9.1 and
+        # 2.11.0, producing a 1-ULP variance delta that compounds through UMT5
+        # encoder blocks and across 50 denoise steps to a multi-percent latent
+        # drift in diffusion pipelines). fp64 mul throughput on Hopper is ~1/64
+        # of fp32, but this runs once per RMSNorm per step on a (B, seq, hidden)
+        # reduction — negligible vs the surrounding matmuls.
+        variance = x_var.double().pow(2).mean(dim=-1, keepdim=True).float()
         x = x * torch.rsqrt(variance + self.variance_epsilon)
         x = (x * self.weight).to(orig_dtype)
         if residual is None:
