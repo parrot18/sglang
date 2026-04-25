@@ -929,8 +929,8 @@ class Fp8MoEMethod(FusedMoEMethodBase):
             will_use_deepgemm = self.is_deepgemm_moe_runner_backend_enabled()
 
             if self.is_fp4_expert:
-                layer.w13_weight.data = layer.w13_weight.data.view(torch.int8)
-                layer.w2_weight.data = layer.w2_weight.data.view(torch.int8)
+                layer.w13_weight.data = layer.w13_weight.data.view(torch.uint8)
+                layer.w2_weight.data = layer.w2_weight.data.view(torch.uint8)
 
                 if envs.SGLANG_OPT_USE_DEEPGEMM_MEGA_MOE.get():
                     from sglang.srt.models.deepseek_v4 import (
