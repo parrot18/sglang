@@ -327,6 +327,7 @@ class HiSparseTokenToKVPoolAllocator(BaseTokenToKVPoolAllocator):
             return
 
         if self.is_not_in_free_group:
+            self.free_hisparse(free_index)
             self.logical_attn_allocator.free(free_index)
         else:
             self.free_group.append(free_index)
