@@ -2010,7 +2010,7 @@ def build_mega_moe_experts_weights(experts) -> None:
         w13_sf_fp32,
         mn=n1,
         k=k1,
-        recipe=(1, 32),
+        recipe_ab=(1, 32),
         num_groups=num_groups,
         disable_ue8m0_cast=False,
     )
@@ -2018,7 +2018,7 @@ def build_mega_moe_experts_weights(experts) -> None:
         w2_sf_fp32,
         mn=n2,
         k=k2,
-        recipe=(1, 32),
+        recipe_ab=(1, 32),
         num_groups=num_groups,
         disable_ue8m0_cast=False,
     )

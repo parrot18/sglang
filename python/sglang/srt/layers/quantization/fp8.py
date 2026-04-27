@@ -958,7 +958,7 @@ class Fp8MoEMethod(FusedMoEMethodBase):
                             scale_param.data,
                             mn=n,
                             k=k,
-                            recipe=(1, 32),
+                            recipe_ab=(1, 32),
                             num_groups=num_experts,
                             disable_ue8m0_cast=False,
                         )
